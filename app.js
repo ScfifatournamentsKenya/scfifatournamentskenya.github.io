@@ -14,6 +14,17 @@ function resetTournamentEditor() {
 $('cancelTournament').onclick = resetTournamentEditor;
 const message=(id,s)=>$(id).textContent=s;
 const safeImg=url=>/^https:\/\//i.test(url||'')?'<img class="avatar" src="'+esc(url)+'" alt="Gamer photo" loading="lazy">':'';
+function tournamentPoster(tournament) {
+  const url = tournament.image_url?.trim();
+  if (!url || !/^https:\/\//i.test(url)) return '';
+  return '<img data-tournament-poster src="' + esc(url) + '" alt="' +
+    esc(tournament.title + ' poster') + '" loading="lazy" decoding="async" referrerpolicy="no-referrer" ' +
+    'style="display:block;width:auto;max-width:100%;max-height:32rem;height:auto;margin-bottom:12px;border-radius:10px">';
+}
+
+$('publicTournaments').addEventListener('error', event => {
+  if (event.target.matches('[data-tournament-poster]')) event.target.remove();
+}, true);
 async function loadPublic(){let [c,t,p]=await Promise.all([db.from('sc_public_categories').select('*').order('name').order('id'),db.from('sc_public_tournaments').select('*').order('tournament_date').order('id'),db.from('sc_public_profiles').select('*').order('registration_id')]);if(c.error||t.error||p.error){message('registrationNotice','Database setup needed: '+(c.error||t.error||p.error).message);return}const selectedCategory = $('publicCategory').value;
 const selectedTournament = $('publicTournament').value;
 const adminCategory = $('adminCategory').value;
@@ -21,7 +32,7 @@ categories=c.data||[];tournaments=t.data||[];profiles=p.data||[];const opts=cate
 $('adminCategory').value = adminCategory;
 renderTournamentOptions();
 $('publicTournament').value = selectedTournament;
-$('publicTournaments').innerHTML=tournaments.map(x=>'<div class="item"><strong>'+esc(x.title)+'</strong><p class="muted">'+esc(categories.find(c=>c.id===x.category_id)?.name||'Game')+' • '+esc(x.tournament_date||'Date TBA')+' • '+esc(x.venue||'Venue TBA')+' • '+esc(x.registration_fee)+' KES registration'+(x.prize_pool == null ? '' : ' • '+esc(x.prize_pool)+' KES prize pool')+'</p></div>').join('')||'<p class="muted">No tournaments yet.</p>';renderProfiles();if(admin)renderAdminLists()}
+$('publicTournaments').innerHTML=tournaments.map(x=>'<div class="item">'+tournamentPoster(x)+'<strong>'+esc(x.title)+'</strong><p class="muted">'+esc(categories.find(c=>c.id===x.category_id)?.name||'Game')+' • '+esc(x.tournament_date||'Date TBA')+' • '+esc(x.venue||'Venue TBA')+' • '+esc(x.registration_fee)+' KES registration'+(x.prize_pool == null ? '' : ' • '+esc(x.prize_pool)+' KES prize pool')+'</p></div>').join('')||'<p class="muted">No tournaments yet.</p>';renderProfiles();if(admin)renderAdminLists()}
 function renderTournamentOptions(){let selected=$('publicCategory').value;$('publicTournament').innerHTML='<option value="">Choose a tournament</option>'+openTournaments().filter(t=>String(t.category_id)===selected).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.title)+'</option>').join('')}
 $('publicCategory').addEventListener('change',renderTournamentOptions);
 $('publicForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),b=e.target.querySelector('button');b.disabled=true;message('registrationNotice','Submitting...');const {data,error}=await db.rpc('sc_submit_registration',{p_name:String(f.get('name')).trim(),p_tag:String(f.get('tag')).trim(),p_country:String(f.get('country')).trim(),p_tournament_id:$('publicTournament').value,p_payment_reference:String(f.get('payment')||'').trim()||null});b.disabled=false;if(error){message('registrationNotice','Could not register: '+error.message);return}message('registrationNotice','Registration submitted! Your reference ID: '+data+'. Approval and payment verification are pending.');e.target.reset();renderTournamentOptions()};
