@@ -40,20 +40,56 @@ function renderProfiles(){const q=$('searchInput').value.trim().toLowerCase();$(
 $('searchInput').oninput=renderProfiles;$('searchButton').onclick=renderProfiles;
 $('gamerList').onclick=e=>{let b=e.target.closest('[data-profile]');if(b)viewProfile(b.dataset.profile)};
 async function viewProfile(id) {
-let p = profiles.find(x => String(x.registration_id) === id);
-if (!p && /^[0-9a-f-]{36}$/i.test(id)) {
-  const response = await db.from('sc_public_profiles').select('*').eq('registration_id', id).maybeSingle();
-  if (response.error) {
-    message('profileView', 'The profile could not be loaded.');
+  const view = $('profileView');
+  const url = new URL(location.pathname, location.origin);
+  url.searchParams.set('gamer', id);
+  url.hash = 'gamers';
+  const directoryUrl = location.pathname + '#gamers';
+
+  message('profileView', 'Loading gamer pass…');
+  document.body.classList.add('gamer-pass-page');
+  history.replaceState(null, '', url);
+  window.scrollTo(0, 0);
+
+  let profile = profiles.find(item => String(item.registration_id) === id);
+  if (!profile && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id)) {
+    const response = await db.from('sc_public_profiles').select('*').eq('registration_id', id).maybeSingle();
+    profile = response.data;
+  }
+
+  const backLink = '<p class="pass-navigation"><a href="' + esc(directoryUrl) + '">Browse approved gamers</a></p>';
+  if (!profile) {
+    view.innerHTML = '<p>This approved gamer pass is unavailable.</p>' + backLink;
     return;
   }
-  p = response.data;
-}
-if (!p) {
-  message('profileView', 'This approved gamer profile is unavailable.');
-  return;
-}history.replaceState(null,'',location.pathname+'?gamer='+encodeURIComponent(id)+'#gamers');$('profileView').innerHTML='<div class="profile"><div class="pill">SC FIFA • APPROVED GAMER</div>'+safeImg(p.photo_url)+'<h2>'+esc(p.gamer_name)+'</h2><p>'+esc(p.gamer_tag||'')+' • '+esc(p.country||'')+'</p><p class="muted">'+esc(tournaments.find(t=>t.id===p.tournament_id)?.title||'Tournament')+'</p><div id="qr" class="qr"></div><p class="muted">Scan to open this approved profile.</p></div>';if(window.QRCode)new window.QRCode($('qr'),{text:location.origin+location.pathname+'?gamer='+encodeURIComponent(id)+'#gamers',width:160,height:160});else $('qr').textContent='QR generator unavailable';
-$('profileView').scrollIntoView({block: 'start'});
+
+  const tournament = tournaments.find(item => String(item.id) === String(profile.tournament_id));
+  const game = tournament && categories.find(item => String(item.id) === String(tournament.category_id));
+  const details = [profile.country, game?.name, tournament?.title]
+    .filter(Boolean)
+    .map(value => '<p>' + esc(value) + '</p>')
+    .join('');
+  const tag = String(profile.gamer_tag || '').replace(/^@+/, '');
+
+  view.innerHTML = `<article class="profile gamer-pass">
+    <p class="pass-brand">SC FIFA TOURNAMENTS • GAMER PASS</p>
+    ${safeImg(profile.photo_url)}
+    <h1>${esc(profile.gamer_name)}</h1>
+    ${tag ? '<p class="pass-tag">@' + esc(tag) + '</p>' : ''}
+    <div class="pass-details">${details}</div>
+    <span class="pass-status">REGISTERED</span>
+    <div class="pass-code">
+      <div id="qr" class="qr" aria-label="Gamer pass QR code"></div>
+      <p>Scan to open this gamer pass.</p>
+    </div>
+  </article>${backLink}`;
+
+  if (window.QRCode) {
+    new window.QRCode($('qr'), {text: url.href, width: 180, height: 180});
+  } else {
+    $('qr').parentElement.innerHTML = '<a href="' + esc(url.href) + '">Open gamer pass link</a>';
+  }
+  window.scrollTo(0, 0);
 }
 async function isAdmin() {
   const {data: {session}} = await db.auth.getSession();
@@ -136,7 +172,14 @@ $('tournamentForm').onsubmit = async event => {
 };
 (async () => {
   const id = new URLSearchParams(location.search).get('gamer');
+  if (id) {
+    document.body.classList.add('gamer-pass-page');
+    message('profileView', 'Loading gamer pass…');
+  }
   await loadPublic();
-  if (id) await viewProfile(id);
+  if (id) {
+    await viewProfile(id);
+    return;
+  }
   await checkAdmin();
 })();
