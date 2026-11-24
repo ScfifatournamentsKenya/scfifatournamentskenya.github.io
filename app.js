@@ -52,7 +52,9 @@ if (!p && /^[0-9a-f-]{36}$/i.test(id)) {
 if (!p) {
   message('profileView', 'This approved gamer profile is unavailable.');
   return;
-}history.replaceState(null,'',location.pathname+'?gamer='+encodeURIComponent(id)+'#gamers');$('profileView').innerHTML='<div class="profile"><div class="pill">SC FIFA • APPROVED GAMER</div>'+safeImg(p.photo_url)+'<h2>'+esc(p.gamer_name)+'</h2><p>'+esc(p.gamer_tag||'')+' • '+esc(p.country||'')+'</p><p class="muted">'+esc(tournaments.find(t=>t.id===p.tournament_id)?.title||'Tournament')+'</p><div id="qr" class="qr"></div><p class="muted">Scan to open this approved profile.</p></div>';if(window.QRCode)new window.QRCode($('qr'),{text:location.origin+location.pathname+'?gamer='+encodeURIComponent(id)+'#gamers',width:160,height:160});else $('qr').textContent='QR generator unavailable'}
+}history.replaceState(null,'',location.pathname+'?gamer='+encodeURIComponent(id)+'#gamers');$('profileView').innerHTML='<div class="profile"><div class="pill">SC FIFA • APPROVED GAMER</div>'+safeImg(p.photo_url)+'<h2>'+esc(p.gamer_name)+'</h2><p>'+esc(p.gamer_tag||'')+' • '+esc(p.country||'')+'</p><p class="muted">'+esc(tournaments.find(t=>t.id===p.tournament_id)?.title||'Tournament')+'</p><div id="qr" class="qr"></div><p class="muted">Scan to open this approved profile.</p></div>';if(window.QRCode)new window.QRCode($('qr'),{text:location.origin+location.pathname+'?gamer='+encodeURIComponent(id)+'#gamers',width:160,height:160});else $('qr').textContent='QR generator unavailable';
+$('profileView').scrollIntoView({block: 'start'});
+}
 async function isAdmin() {
   const {data: {session}} = await db.auth.getSession();
   if (!session) return false;
@@ -132,4 +134,9 @@ $('tournamentForm').onsubmit = async event => {
   await loadPublic();
   message('adminNotice', 'Tournament saved.');
 };
-(async()=>{await loadPublic();await checkAdmin();let id=new URLSearchParams(location.search).get('gamer');if(id)viewProfile(id)})();
+(async () => {
+  const id = new URLSearchParams(location.search).get('gamer');
+  await loadPublic();
+  if (id) await viewProfile(id);
+  await checkAdmin();
+})();
